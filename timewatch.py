@@ -11,6 +11,7 @@ class TimeWatch:
     self.site = "http://checkin.timewatch.co.il/"
     self.editpath = "punch/editwh3.php"
     self.loginpath = "punch/punch2.php"
+    self.dayspath = "punch/editwh.php"
 
     # negative shift means start of `abs(shift)`-th day of previous month, until `abs(shift)-1`-th day of currnt month
     # for example, shift -25 for March will yield Feb 25th until Mar 24th.
@@ -23,6 +24,9 @@ class TimeWatch:
 
   def post(self, path, data):
     return self.session.post(os.path.join(self.site, path), data)
+
+  def get(self, path, data):
+    return self.session.get(os.path.join(self.site, path), params=data)
 
   def login(self, company, user, password):
     """Company - company number is filled by user when logging in
@@ -42,9 +46,15 @@ class TimeWatch:
 
     return r
 
-  def edit_day(self, date):
+  def edit_date(self, date, start_hour=10, start_minute=0, end_hour=19, end_minute=0, time=None):
     date_str = '{y}-{m}-{d}'.format(y=date.year, m=date.month, d=date.day)
-    start_hour, start_minute, end_hour, end_minute = 10, 0, 19, 0
+
+    if time is 0:
+      start_hour, start_minute, end_hour, end_minute = '', '', '', ''
+    elif time:
+      time_hour, time_minute = time
+      end_hour, end_minute = start_hour + time_hour, start_minute + time_minute
+
     data = {'e': self.employeeid, 'tl': self.employeeid, 'c': self.company, 'd': date_str}
     #data.update({'inclcontracts': 0, 'job': 0, 'allowabsence': 3, 'allowremarks': 1, 'teken': 0, 'remark': '', 'speccomp': '', 'atype': 0, 'excuse': 0, 'atypehidden': 0, 'jd': '2016-04-01', 'nextdate': ''})
     data.update({'task0': 0, 'taskdescr0': '', 'what0': 1, 'emm0': start_minute, 'ehh0': start_hour, 'xmm0': end_minute, 'xhh0': end_hour})
@@ -58,11 +68,17 @@ class TimeWatch:
       raise TimeWatchException("edit failed!")
     return r
 
-  def workday(self, date):
-    if date.weekday() in self.offdays:
-      return False
-    # TODO: handle holidays
-    return True
+  def parse_expected_times(self, year, month, dates=[]):
+    data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
+    r = self.get(self.dayspath, data)
+
+    date_times = {}
+    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+      tds = tr.findAll('td')
+      date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
+      time = tds[10].getText().replace("&nbsp;", "")
+      date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
+    return date_times
 
   def monthdays(self, year, month, shift):
     if shift < 0:
@@ -99,9 +115,16 @@ class TimeWatch:
       date = start_date + datetime.timedelta(n)
       yield date
 
-  def edit_month(self, year, month):
+  def edit_month_blind(self, year, month):
     for date in self.monthdays(year, month, self.shift):
-      if not self.workday(date):
-        continue
+      self.edit_date(date)
 
-      self.edit_day(date)
+  def edit_month(self, year, month):
+    dates = list(self.monthdays(year, month, self.shift))
+    for date in dates:
+      self.edit_date(date, end_hour='', end_minute='')
+
+    date_times = self.parse_expected_times(year, month)
+
+    for date, time in date_times.items():
+      self.edit_date(date, time=time)
