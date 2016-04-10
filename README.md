@@ -5,7 +5,7 @@ It reads the expected work hours for each day and automatically sets each day's 
 It is therefor handling govt. off days and weekends.
 
 Usage is trivial:
-./main <company id> <employee number> <password> <report year> <report month>
+```./main <company id> <employee number> <password> <report year> <report month>```
 
 Known issues:
 * Doesn't sign the doc (I suggest you do it manually after reviewing there are no bugs in the report).
