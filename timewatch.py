@@ -144,8 +144,16 @@ class TimeWatch:
   def edit_month(self, year, month):
     # get days to work on
     dates = list(self.monthdays(year, month, self.shift))
-    for date in dates:
-      self.edit_date(date, end_hour='', end_minute='')
+
+    if self.override == 'all':
+      # in override=all mode, make sure all times are cleaned
+      for date in dates:
+        self.edit_date(date, end_hour='', end_minute='')
+    elif self.override == 'incomplete':
+      # in override=incomplete mode, only override incomplete data
+      pass
+    elif self.override == 'regular':
+      raise NotImplemented("override='regular' is not implemented. expected: wont override days with a cause (vacation, sick day, etc)")
 
     date_times = self.parse_expected_times(year, month)
 
