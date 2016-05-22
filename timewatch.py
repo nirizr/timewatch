@@ -18,7 +18,9 @@ class TimeWatch:
     # positive shift means start of `shift`-th day of current month, until `shift-1`-th day of next month
     self.shift = -25
     self.offdays = [4, 5]
-    
+    self.override = 'all'
+    self._config = ['shift', 'offdays', 'override']
+
     self.loggedin = False
     self.session = requests.Session()
 
@@ -45,6 +47,16 @@ class TimeWatch:
     self.employeeid = int(BeautifulSoup.BeautifulSoup(r.text).find('input', id='ixemplee').get('value'))
 
     return r
+
+  def set_config(self, **kws):
+    for key, value in kws.items():
+      if not key in self.config:
+        continue
+
+      if hasattr(self, "set_" + key):
+        getattr(self, "set_" + key)(value)
+      else:
+        setattr(self, key, value)
 
   def edit_date(self, date, start_hour=10, start_minute=0, end_hour=19, end_minute=0, time=None):
     date_str = '{y}-{m}-{d}'.format(y=date.year, m=date.month, d=date.day)
