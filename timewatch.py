@@ -92,6 +92,15 @@ class TimeWatch:
       date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
     return date_times
 
+  def workday(self, date):
+    weekday_representation = [date.strftime(fmt).lower() for fmt in ('%a', '%A', '%w')]
+
+    for offday in self.offdays:
+      if str(offday).lower() in weekday_representation:
+        return False
+
+    return True
+
   def monthdays(self, year, month, shift):
     if shift < 0:
       if month == 1:
@@ -125,18 +134,21 @@ class TimeWatch:
 
     for n in range(int ((end_date - start_date).days)):
       date = start_date + datetime.timedelta(n)
-      yield date
+      if workday(date):
+        yield date
 
   def edit_month_blind(self, year, month):
     for date in self.monthdays(year, month, self.shift):
       self.edit_date(date)
 
   def edit_month(self, year, month):
+    # get days to work on
     dates = list(self.monthdays(year, month, self.shift))
     for date in dates:
       self.edit_date(date, end_hour='', end_minute='')
 
     date_times = self.parse_expected_times(year, month)
 
-    for date, time in date_times.items():
+    for date in dates:
+      time  = date_times.get(date, None)
       self.edit_date(date, time=time)
