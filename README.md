@@ -11,7 +11,6 @@ Known issues:
 * Doesn't sign the doc (I suggest you do it manually after reviewing there are no bugs in the report).
 * it'll overwrite any manually/automatically reported events, including vacation/sick days you reported prior to running the script for the specific month
 * hidden configuration parameters should be exposed from CLI, include:
-
-* * offdays (which week days are considered working days).
-* * shift (offset of month days to start reporting from).
-* * override (behavior when encountering partially filled data).
+  * offdays (which week days are considered working days).
+  * shift (offset of month days to start reporting from).
+  * override (behavior when encountering partially filled data).
