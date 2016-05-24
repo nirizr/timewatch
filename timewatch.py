@@ -1,6 +1,7 @@
 import requests
 import os
 import datetime
+import time
 import BeautifulSoup
 
 class TimeWatchException(Exception):
@@ -17,9 +18,9 @@ class TimeWatch:
     # for example, shift -25 for March will yield Feb 25th until Mar 24th.
     # positive shift means start of `shift`-th day of current month, until `shift-1`-th day of next month
     self.shift = -25
-    self.offdays = [4, 5]
-    self.override = 'all'
-    self._config = ['shift', 'offdays', 'override']
+    self.offdays = ['friday', 'saturday']
+    self.override = 'incomplete'
+    self.config = ['shift', 'offdays', 'override']
 
     self.loggedin = False
     self.session = requests.Session()
@@ -89,7 +90,10 @@ class TimeWatch:
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       time = tds[10].getText().replace("&nbsp;", "")
-      date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
+      try:
+        date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
+      except Exception as e:
+        pass
     return date_times
 
   def workday(self, date):
@@ -100,6 +104,17 @@ class TimeWatch:
         return False
 
     return True
+
+  def month_number(self, month):
+    if month.isdigit():
+      return int(month)
+
+    for fmt in ['%b', '%B']:
+      try:
+        return time.strptime(month, fmt).tm_mon
+      except Exception as ex:
+        print(ex)
+    return month
 
   def monthdays(self, year, month, shift):
     if shift < 0:
@@ -134,7 +149,7 @@ class TimeWatch:
 
     for n in range(int ((end_date - start_date).days)):
       date = start_date + datetime.timedelta(n)
-      if workday(date):
+      if self.workday(date):
         yield date
 
   def edit_month_blind(self, year, month):
@@ -143,7 +158,9 @@ class TimeWatch:
 
   def edit_month(self, year, month):
     # get days to work on
+    month = self.month_number(month)
     dates = list(self.monthdays(year, month, self.shift))
+    default_time = None
 
     if self.override == 'all':
       # in override=all mode, make sure all times are cleaned
@@ -151,12 +168,13 @@ class TimeWatch:
         self.edit_date(date, end_hour='', end_minute='')
     elif self.override == 'incomplete':
       # in override=incomplete mode, only override incomplete data
-      pass
+      # so simply clear dates without expected time
+      default_time = 0
     elif self.override == 'regular':
       raise NotImplemented("override='regular' is not implemented. expected: wont override days with a cause (vacation, sick day, etc)")
 
     date_times = self.parse_expected_times(year, month)
 
     for date in dates:
-      time  = date_times.get(date, None)
+      time = date_times.get(date, default_time)
       self.edit_date(date, time=time)
