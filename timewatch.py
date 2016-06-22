@@ -68,7 +68,7 @@ class TimeWatch:
       time_hour, time_minute = time
       end_hour, end_minute = start_hour + time_hour, start_minute + time_minute
 
-    data = {'e': self.employeeid, 'tl': self.employeeid, 'c': self.company, 'd': date_str}
+    data = {'e': self.employeeid, 'tl': self.employeeid, 'c': self.company, 'd': date_str, 'next_date': ''}
     #data.update({'inclcontracts': 0, 'job': 0, 'allowabsence': 3, 'allowremarks': 1, 'teken': 0, 'remark': '', 'speccomp': '', 'atype': 0, 'excuse': 0, 'atypehidden': 0, 'jd': '2016-04-01', 'nextdate': ''})
     data.update({'task0': 0, 'taskdescr0': '', 'what0': 1, 'emm0': start_minute, 'ehh0': start_hour, 'xmm0': end_minute, 'xhh0': end_hour})
     #data.update({'task1': 0, 'taskdescr1': '', 'what1': 1, 'emm1': start_minute, 'ehh1': start_hour, 'xmm1': end_minute, 'xhh1': end_hour})
@@ -79,7 +79,11 @@ class TimeWatch:
     r=self.post(self.editpath, data)
     if "TimeWatch - Reject" in r.text:
       raise TimeWatchException("edit failed!")
+    self.validate_date(date, start_hour, start_minute, end_hour, end_minute)
     return r
+
+  def clean_text(self, text):
+    return text.strip().replace("&nbsp;", "")
 
   def parse_expected_times(self, year, month, dates=[]):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
@@ -89,12 +93,27 @@ class TimeWatch:
     for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
-      time = tds[10].getText().replace("&nbsp;", "")
-      try:
-        date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
-      except Exception as e:
-        pass
+      time = self.clean_text(tds[10].getText())
+      date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
     return date_times
+
+  def validate_date(self, expected_date, expected_start_hour, expected_start_minute, expected_end_hour, expected_end_minute):
+    data = {'ee': self.employeeid, 'e': self.company, 'y': expected_date.year, 'm': expected_date.month}
+    r = self.get(self.dayspath, data)
+
+    date_times = {}
+    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+      tds = tr.findAll('td')
+      date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
+      if date != expected_date:
+        continue
+      start_time = [int(i) for i in self.clean_text(tds[2].getText()).split(":") if i]
+      end_time = [int(i) for i in self.clean_text(tds[3].getText()).split(":") if i]
+
+      expected_start_time = [int(i) for i in (expected_start_hour, expected_start_minute) if i != '']
+      expected_end_time = [int(i) for i in (expected_end_hour, expected_end_minute) if i != '']
+      if start_time != expected_start_time or end_time != expected_end_time:
+        raise TimewatchError("validation failed", start_time, expected_start_time, end_time, expected_end_time)
 
   def workday(self, date):
     weekday_representation = [date.strftime(fmt).lower() for fmt in ('%a', '%A', '%w')]
@@ -110,10 +129,7 @@ class TimeWatch:
       return int(month)
 
     for fmt in ['%b', '%B']:
-      try:
-        return time.strptime(month, fmt).tm_mon
-      except Exception as ex:
-        print(ex)
+      return time.strptime(month, fmt).tm_mon
     return month
 
   def monthdays(self, year, month, shift):
