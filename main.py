@@ -7,7 +7,7 @@ import logging
 import timewatch
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='Fill timewatch form')
+  parser = argparse.ArgumentParser(description='Automatic work hours reporting for timewatch.co.il')
   
   parser.add_argument('company', type=int, help='Company ID')
   parser.add_argument('user', help='user name/id')
