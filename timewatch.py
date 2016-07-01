@@ -1,29 +1,50 @@
 import requests
+import BeautifulSoup
+
 import os
 import datetime
 import time
-import BeautifulSoup
+import logging
+import random
 
 class TimeWatchException(Exception):
   pass
 
 class TimeWatch:
-  def __init__(self):
+  def __init__(self, loglevel=logging.WARNING, **kwargs):
     self.site = "http://checkin.timewatch.co.il/"
     self.editpath = "punch/editwh3.php"
     self.loginpath = "punch/punch2.php"
     self.dayspath = "punch/editwh.php"
 
-    # negative shift means start of `abs(shift)`-th day of previous month, until `abs(shift)-1`-th day of currnt month
-    # for example, shift -25 for March will yield Feb 25th until Mar 24th.
-    # positive shift means start of `shift`-th day of current month, until `shift-1`-th day of next month
-    self.shift = -25
     self.offdays = ['friday', 'saturday']
     self.override = 'incomplete'
-    self.config = ['shift', 'offdays', 'override']
+    self.jitter = 0
+    self.starttime = '10:00'
+    self.duration = '9:00'
+    self.retries = 3
+    self.config = ['offdays', 'override', 'jitter', 'starttime', 'duration']
+
+    logging.basicConfig()
+    self.logger = logging.getLogger(__name__)
+    self.logger.setLevel(loglevel)
 
     self.loggedin = False
     self.session = requests.Session()
+
+    self.set_config(**kwargs)
+
+  def set_config(self, **kws):
+    for key, value in kws.items():
+      if not key in self.config:
+        continue
+
+      if hasattr(self, "set_" + key):
+        getattr(self, "set_" + key)(value)
+      else:
+        setattr(self, key, value)
+
+      self.logger.debug("Set {} = '{}'".format(key, value))
 
   def post(self, path, data):
     return self.session.post(os.path.join(self.site, path), data)
@@ -47,26 +68,62 @@ class TimeWatch:
     self.password = password
     self.employeeid = int(BeautifulSoup.BeautifulSoup(r.text).find('input', id='ixemplee').get('value'))
 
+    self.logger.info("successfully logged in as {} with id {}".format(self.user, self.employeeid))
+
     return r
 
-  def set_config(self, **kws):
-    for key, value in kws.items():
-      if not key in self.config:
-        continue
-
-      if hasattr(self, "set_" + key):
-        getattr(self, "set_" + key)(value)
+  def time_to_tuple(self, t):
+    if isinstance(t, (str, unicode)):
+      t = self.clean_text(t)
+      if ':' in t:
+        t = map(int, t.split(':'))
       else:
-        setattr(self, key, value)
+        t = ('', '')
 
-  def edit_date(self, date, start_hour=10, start_minute=0, end_hour=19, end_minute=0, time=None):
+    if isinstance(t, list):
+      t = tuple(t)
+
+    if not isinstance(t, tuple) or not len(t) == 2:
+      raise Exception("couldn't convert time to tuple: {}".format(t))
+
+    return t
+
+  def tuple_to_str(self, t):
+    return ':'.join(map(str, t))
+
+  def edit_date(self, year, month, date, start=None, end=None, duration=None, jitter=None):
+    if start is None:
+      start = self.starttime
+    start = self.time_to_tuple(start)
+
+    if jitter is None:
+      jitter = self.jitter
+    jitter = random.randint(-self.jitter/2, self.jitter/2)
+    start = start[0] + int(jitter / 60), start[1] + jitter % 60
+
+    if duration is None:
+      duration = self.duration
+
+    if duration == ('', ''):
+      start, end = ('', ''), ('', '')
+    else:
+      duration = self.time_to_tuple(duration)
+
+      end = start[0] + duration[0], start[1] + duration[1]
+
+    failures = 0
+    while not (self.edit_date_post(date, start, end) and self.validate_date(year, month, date, start, end)):
+      failures += 1
+      if failures >= self.retries:
+        self.logger.warn('Failed punching in {} times on {}'.format(failures, date))
+        return False
+
+    return True
+
+  def edit_date_post(self, date, start, end):
     date_str = '{y}-{m}-{d}'.format(y=date.year, m=date.month, d=date.day)
-
-    if time is 0:
-      start_hour, start_minute, end_hour, end_minute = '', '', '', ''
-    elif time:
-      time_hour, time_minute = time
-      end_hour, end_minute = start_hour + time_hour, start_minute + time_minute
+    start_hour, start_minute = start
+    end_hour, end_minute = end
 
     data = {'e': self.employeeid, 'tl': self.employeeid, 'c': self.company, 'd': date_str, 'next_date': ''}
     #data.update({'inclcontracts': 0, 'job': 0, 'allowabsence': 3, 'allowremarks': 1, 'teken': 0, 'remark': '', 'speccomp': '', 'atype': 0, 'excuse': 0, 'atypehidden': 0, 'jd': '2016-04-01', 'nextdate': ''})
@@ -78,27 +135,31 @@ class TimeWatch:
     #data.update({'fhhh': '', 'fhmm': '', 'thhh': '', 'thmm': ''})
     r=self.post(self.editpath, data)
     if "TimeWatch - Reject" in r.text:
-      raise TimeWatchException("edit failed!")
-    self.validate_date(date, start_hour, start_minute, end_hour, end_minute)
-    return r
+      self.logger.info('Failure punching in on {} as {} to {}'.format(date_str, self.tuple_to_str(start), self.tuple_to_str(end)))
+      return False
+
+    self.logger.info('Punched in on {} as {} to {}'.format(date_str, self.tuple_to_str(start), self.tuple_to_str(end)))
+    return True
 
   def clean_text(self, text):
     return text.strip().replace("&nbsp;", "")
 
-  def parse_expected_times(self, year, month, dates=[]):
+  def parse_expected_durations(self, year, month):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
-    date_times = {}
+    date_durations = {}
     for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
-      time = self.clean_text(tds[10].getText())
-      date_times[date] = map(int, time.split(":")) if time and (not dates or date in dates) else 0
-    return date_times
+      duration = self.time_to_tuple(tds[10].getText())
+      date_durations[date] = duration
+      self.logger.debug('parsed expected durarion for {} as {}'.format(date, duration))
 
-  def validate_date(self, expected_date, expected_start_hour, expected_start_minute, expected_end_hour, expected_end_minute):
-    data = {'ee': self.employeeid, 'e': self.company, 'y': expected_date.year, 'm': expected_date.month}
+    return date_durations
+
+  def validate_date(self, year, month, expected_date, expected_start, expected_end):
+    data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
     date_times = {}
@@ -107,90 +168,54 @@ class TimeWatch:
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       if date != expected_date:
         continue
-      start_time = [int(i) for i in self.clean_text(tds[2].getText()).split(":") if i]
-      end_time = [int(i) for i in self.clean_text(tds[3].getText()).split(":") if i]
+      start = self.time_to_tuple(tds[2].getText())
+      end = self.time_to_tuple(tds[3].getText())
 
-      expected_start_time = [int(i) for i in (expected_start_hour, expected_start_minute) if i != '']
-      expected_end_time = [int(i) for i in (expected_end_hour, expected_end_minute) if i != '']
-      if start_time != expected_start_time or end_time != expected_end_time:
-        raise TimewatchError("validation failed", start_time, expected_start_time, end_time, expected_end_time)
-
-  def workday(self, date):
-    weekday_representation = [date.strftime(fmt).lower() for fmt in ('%a', '%A', '%w')]
-
-    for offday in self.offdays:
-      if str(offday).lower() in weekday_representation:
+      if start != expected_start or end != expected_end:
+        self.logger.info('Validation failed, expected: {} - {}. read: {} - {}'.format(expected_start, expected_end, start, end))
         return False
 
-    return True
+      self.logger.debug('Successful validation for {} as {}-{}'.format(expected_date, start, end))
+      return True
+
+    self.logger.info('Validation failed reading punch time for {}'.format(expected_date))
+    return False
 
   def month_number(self, month):
-    if month.isdigit():
+    if isinstance(month, int):
+      return month
+
+    if isinstance(month, (str, unicode)) and month.isdigit():
       return int(month)
 
     for fmt in ['%b', '%B']:
       return time.strptime(month, fmt).tm_mon
-    return month
 
-  def monthdays(self, year, month, shift):
-    if shift < 0:
-      if month == 1:
-        start_month = 12
-        start_year = year - 1
-      else:
-        start_month = month - 1
-        start_year = year
-      start_day = -shift
-    elif shift >= 0:
-      start_day = 1 + shift
-      start_month = month
-      start_year = year
-
-    start_date = datetime.date(start_year, start_month, start_day)
-
-    if shift < 0:
-      end_day = -shift
-      end_month = month
-      end_year = year
-    elif shift >= 0:
-      if month == 12:
-        end_month = 1
-        end_year = year + 1
-      else:
-        end_month = month + 1
-        end_year = year
-      end_day = 1 + shift
-
-    end_date = datetime.date(end_year, end_month, end_day)
-
-    for n in range(int ((end_date - start_date).days)):
-      date = start_date + datetime.timedelta(n)
-      if self.workday(date):
-        yield date
-
-  def edit_month_blind(self, year, month):
-    for date in self.monthdays(year, month, self.shift):
-      self.edit_date(date)
+    raise ValueError("Invalid month input: {}".format(month))
 
   def edit_month(self, year, month):
-    # get days to work on
     month = self.month_number(month)
-    dates = list(self.monthdays(year, month, self.shift))
-    default_time = None
+
+    # get days to work on
+    dates = sorted(self.parse_expected_durations(year, month).keys())
+    default_duration = None
 
     if self.override == 'all':
       # in override=all mode, make sure all times are cleaned
+      self.logger.info('overwriting all entries to retrieve expected durations')
       for date in dates:
-        self.edit_date(date, end_hour='', end_minute='')
+        self.edit_date(year, month, date, end=['', ''])
     elif self.override == 'incomplete':
       # in override=incomplete mode, only override incomplete data
       # so simply clear dates without expected time
-      default_time = 0
+      default_duration = 0
     elif self.override == 'regular':
       raise NotImplemented("override='regular' is not implemented. expected: wont override days with a cause (vacation, sick day, etc)")
 
-    date_times = self.parse_expected_times(year, month)
+    self.logger.info('parsing expected durations')
+    date_durations = self.parse_expected_durations(year, month)
 
+    self.logger.info('punching in')
     for date in dates:
-      time = date_times.get(date, default_time)
-      self.edit_date(date, time=time)
+      duration = date_durations.get(date, default_duration)
+      self.edit_date(year, month, date, duration=duration)
