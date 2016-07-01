@@ -6,7 +6,7 @@ You're too preoccupied with work, and forget filling up timewatch.co.il?
 
 We've all been there, just set up a monthly timewatch cron and get back to work!
 
-### what is this?
+### What is this?
 This script automatically sets default working hours for all work days using timewatch.co.il's web interface.
 It reads expected work hours for each day and automatically sets each day's work to that amount.
 It is therefor handling govt. off days and weekends, and is quite configurable.
@@ -15,7 +15,7 @@ It is therefor handling govt. off days and weekends, and is quite configurable.
 To report required working hours for the current month, simply execute
 ```./main <company id> <employee number> <password>```
 
-### full usage and functionality
+### Full usage and functionality
 
 ```
 usage: main.py [-h] [-y YEAR] [-m MONTH] [-v] [-o {all,incomplete,regular}]
@@ -44,6 +44,14 @@ optional arguments:
                         punch-in time
   -j JITTER, --jitter JITTER
                         punching time random range in minutes.
+```
+
+### Installation
+
+```
+git clone https://github.com/nirizr/timewatch.git
+cd timewatch
+pip install -r requirements.txt
 ```
 
 ### Known issues
