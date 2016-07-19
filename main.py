@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
   parser.add_argument('-v', '--verbose', default=0, action='count', help='increase logging level')
 
-  parser.add_argument('-o', '--override', default='incomplete',
+  parser.add_argument('-o', '--override', default='regular',
                        choices=['all', 'incomplete', 'regular'],
                        help='Control override behavior. all - override all '
                             'working days, unsafe to vacation/sick days. '
