@@ -109,6 +109,7 @@ class TimeWatch:
     else:
       duration = self.time_to_tuple(duration)
 
+    if not end:
       end = start[0] + duration[0], start[1] + duration[1]
 
     failures = 0
@@ -143,6 +144,18 @@ class TimeWatch:
 
   def clean_text(self, text):
     return text.strip().replace("&nbsp;", "")
+
+  def parse_dates(self, year, month):
+    data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
+    r = self.get(self.dayspath, data)
+
+    dates = set()
+    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+      tds = tr.findAll('td')
+      date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
+      dates.add(date)
+
+    return dates
 
   def parse_expected_durations(self, year, month):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
@@ -197,14 +210,14 @@ class TimeWatch:
     month = self.month_number(month)
 
     # get days to work on
-    dates = sorted(self.parse_expected_durations(year, month).keys())
+    dates = sorted(self.parse_dates(year, month))
     default_duration = None
 
     if self.override == 'all':
       # in override=all mode, make sure all times are cleaned
       self.logger.info('overwriting all entries to retrieve expected durations')
       for date in dates:
-        self.edit_date(year, month, date, end=['', ''])
+        self.edit_date(year, month, date, end=('', ''))
     elif self.override == 'incomplete':
       # in override=incomplete mode, only override incomplete data
       # so simply clear dates without expected time
