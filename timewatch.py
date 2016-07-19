@@ -145,7 +145,7 @@ class TimeWatch:
   def clean_text(self, text):
     return text.strip().replace("&nbsp;", "")
 
-  def parse_dates(self, year, month):
+  def parse_dates(self, year, month, keep_cause):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
@@ -153,7 +153,9 @@ class TimeWatch:
     for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
-      dates.add(date)
+      cause = True if self.clean_text(tds[8].getText()) else False
+      if keep_cause is False or cause is False:
+        dates.add(date)
 
     return dates
 
@@ -209,26 +211,34 @@ class TimeWatch:
   def edit_month(self, year, month):
     month = self.month_number(month)
 
-    # get days to work on
-    dates = sorted(self.parse_dates(year, month))
-    default_duration = None
-
     if self.override == 'all':
       # in override=all mode, make sure all times are cleaned
-      self.logger.info('overwriting all entries to retrieve expected durations')
-      for date in dates:
-        self.edit_date(year, month, date, end=('', ''))
+      self.override_all = True
+      self.keep_cause = False
+      self.default_duration = None
     elif self.override == 'incomplete':
       # in override=incomplete mode, only override incomplete data
       # so simply clear dates without expected time
-      default_duration = 0
+      self.override_all = False
+      self.keep_cause = False
+      self.default_duration = 0
     elif self.override == 'regular':
-      raise NotImplemented("override='regular' is not implemented. expected: wont override days with a cause (vacation, sick day, etc)")
+      self.override_all = False
+      self.keep_cause = True
+      self.default_duration = None
+
+    self.logger.info('parsing dates to operate on')
+    dates = sorted(self.parse_dates(year, month, self.keep_cause))
+
+    if self.override_all:
+      self.logger.info('overwriting all entries to retrieve expected durations')
+      for date in dates:
+        self.edit_date(year, month, date, end=('', ''))
 
     self.logger.info('parsing expected durations')
     date_durations = self.parse_expected_durations(year, month)
 
     self.logger.info('punching in')
     for date in dates:
-      duration = date_durations.get(date, default_duration)
+      duration = date_durations.get(date, self.default_duration)
       self.edit_date(year, month, date, duration=duration)
