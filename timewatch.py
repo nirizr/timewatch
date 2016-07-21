@@ -223,7 +223,7 @@ class TimeWatch:
       self.keep_cause = False
       self.default_duration = 0
     elif self.override == 'regular':
-      self.override_all = False
+      self.override_all = True
       self.keep_cause = True
       self.default_duration = None
 
