@@ -54,6 +54,12 @@ cd timewatch
 pip install -r requirements.txt
 ```
 
+or
+
+```
+pip install timewatch
+```
+
 ### Known issues
 * Doesn't sign the doc (I suggest you do it manually after reviewing there are no bugs in the report).
 * no support for reporting vacation/sick days through the script yet (You can report using timewatch's web interface before/after running the script)
