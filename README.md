@@ -59,7 +59,9 @@ pip install -r requirements.txt
 or
 
 ```
-pip install timewatch
+pip install timewatch --target './'
+cd timewatch
+./main.py <args>
 ```
 
 ### Known issues
