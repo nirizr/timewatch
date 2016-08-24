@@ -8,7 +8,7 @@ import timewatch
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Automatic work hours reporting for timewatch.co.il')
-  
+
   parser.add_argument('company', type=int, help='Company ID')
   parser.add_argument('user', help='user name/id')
   parser.add_argument('password', help='user password')
@@ -32,6 +32,8 @@ if __name__ == "__main__":
   parser.add_argument('-j', '--jitter', default=10, type=int,
                        help='punching time random range in minutes.')
 
+  parser.add_argument('-r', '--retries', default=5, help='amount of times to retries on failed punchin')
+
   args = parser.parse_args()
 
   verbosity_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
@@ -41,6 +43,7 @@ if __name__ == "__main__":
   tw=timewatch.TimeWatch(loglevel = logging_level,
                          override = args.override,
                          starttime = args.starttime,
-                         jitter = args.jitter)
+                         jitter = args.jitter
+                         retries = args.retries)
   tw.login(args.company, args.user, args.password)
   tw.edit_month(args.year, args.month)

@@ -22,7 +22,7 @@ class TimeWatch:
     self.jitter = 0
     self.starttime = '10:00'
     self.duration = '9:00'
-    self.retries = 3
+    self.retries = 5
     self.config = ['offdays', 'override', 'jitter', 'starttime', 'duration']
 
     logging.basicConfig()
