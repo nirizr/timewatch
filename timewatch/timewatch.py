@@ -1,6 +1,7 @@
 import requests
 import BeautifulSoup
 
+from tqdm import tqdm
 import os
 import datetime
 import time
@@ -162,9 +163,11 @@ class TimeWatch:
   def parse_expected_durations(self, year, month):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
-
+    durations  = BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'})
     date_durations = {}
-    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+    durations_width = len(durations)
+
+    for tr in tqdm(durations):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       duration = self.time_to_tuple(tds[10].getText())
@@ -239,6 +242,7 @@ class TimeWatch:
     date_durations = self.parse_expected_durations(year, month)
 
     self.logger.info('punching in')
-    for date in dates:
+
+    for date in tqdm(dates):
       duration = date_durations.get(date, self.default_duration)
       self.edit_date(year, month, date, duration=duration)
