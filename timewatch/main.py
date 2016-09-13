@@ -43,7 +43,7 @@ if __name__ == "__main__":
   tw=timewatch.TimeWatch(loglevel = logging_level,
                          override = args.override,
                          starttime = args.starttime,
-                         jitter = args.jitter
+                         jitter = args.jitter,
                          retries = args.retries)
   tw.login(args.company, args.user, args.password)
   tw.edit_month(args.year, args.month)
