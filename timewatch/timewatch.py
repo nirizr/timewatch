@@ -1,5 +1,5 @@
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as BS
 
 from tqdm import tqdm
 import os
@@ -7,6 +7,9 @@ import datetime
 import time
 import logging
 import random
+
+def BeautifulSoup(t):
+    return BS(t, 'html.parser')
 
 class TimeWatchException(Exception):
   pass
@@ -179,7 +182,7 @@ class TimeWatch:
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
-    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+    for tr in BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       if date != expected_date:
