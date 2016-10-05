@@ -24,7 +24,7 @@ class TimeWatch:
     self.starttime = '10:00'
     self.duration = '9:00'
     self.retries = 5
-    self.config = ['offdays', 'override', 'jitter', 'starttime', 'duration']
+    self.config = ['offdays', 'override', 'jitter', 'starttime', 'duration', 'retries']
 
     logging.basicConfig()
     self.logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class TimeWatch:
   def set_config(self, **kws):
     for key, value in kws.items():
       if not key in self.config:
-        continue
+        self.logger.warn("Skipping parameter not listed in config: {}".format(key))
 
       if hasattr(self, "set_" + key):
         getattr(self, "set_" + key)(value)
@@ -165,9 +165,8 @@ class TimeWatch:
     r = self.get(self.dayspath, data)
     durations  = BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'})
     date_durations = {}
-    durations_width = len(durations)
 
-    for tr in tqdm(durations):
+    for tr in durations:
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       duration = self.time_to_tuple(tds[10].getText())
@@ -180,7 +179,6 @@ class TimeWatch:
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
-    date_times = {}
     for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
