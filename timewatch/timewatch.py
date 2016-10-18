@@ -1,5 +1,5 @@
 import requests
-import BeautifulSoup
+from bs4 import BeautifulSoup as BS
 
 from tqdm import tqdm
 import os
@@ -7,6 +7,9 @@ import datetime
 import time
 import logging
 import random
+
+def BeautifulSoup(t):
+    return BS(t, 'html.parser')
 
 class TimeWatchException(Exception):
   pass
@@ -67,17 +70,17 @@ class TimeWatch:
     self.company = company
     self.user = user
     self.password = password
-    self.employeeid = int(BeautifulSoup.BeautifulSoup(r.text).find('input', id='ixemplee').get('value'))
+    self.employeeid = int(BeautifulSoup(r.text).find('input', id='ixemplee').get('value'))
 
     self.logger.info("successfully logged in as {} with id {}".format(self.user, self.employeeid))
 
     return r
 
   def time_to_tuple(self, t):
-    if isinstance(t, (str, unicode)):
+    if isinstance(t, str):
       t = self.clean_text(t)
       if ':' in t:
-        t = map(int, t.split(':'))
+        t = list(map(int, t.split(':')))
       else:
         t = ('', '')
 
@@ -151,7 +154,7 @@ class TimeWatch:
     r = self.get(self.dayspath, data)
 
     dates = set()
-    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+    for tr in BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       cause = True if self.clean_text(tds[8].getText()) else False
@@ -163,7 +166,7 @@ class TimeWatch:
   def parse_expected_durations(self, year, month):
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
-    durations  = BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'})
+    durations  = BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'})
     date_durations = {}
 
     for tr in durations:
@@ -179,7 +182,7 @@ class TimeWatch:
     data = {'ee': self.employeeid, 'e': self.company, 'y': year, 'm': month}
     r = self.get(self.dayspath, data)
 
-    for tr in BeautifulSoup.BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
+    for tr in BeautifulSoup(r.text).findAll('tr', attrs={'class': 'tr'}):
       tds = tr.findAll('td')
       date = datetime.datetime.strptime(tds[0].getText().split(" ")[0], "%d-%m-%Y").date()
       if date != expected_date:
@@ -201,7 +204,7 @@ class TimeWatch:
     if isinstance(month, int):
       return month
 
-    if isinstance(month, (str, unicode)) and month.isdigit():
+    if isinstance(month, str) and month.isdigit():
       return int(month)
 
     for fmt in ['%b', '%B']:
