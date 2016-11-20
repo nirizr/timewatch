@@ -236,7 +236,7 @@ class TimeWatch:
 
     if self.override_all:
       self.logger.info('overwriting all entries to retrieve expected durations')
-      for date in dates:
+      for date in tqdm(dates):
         self.edit_date(year, month, date, end=('', ''))
 
     self.logger.info('parsing expected durations')
