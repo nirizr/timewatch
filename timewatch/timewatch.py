@@ -8,6 +8,11 @@ import time
 import logging
 import random
 
+try:
+  strtypes = (str, unicode)
+except:
+  strtypes = str
+
 def BeautifulSoup(t):
     return BS(t, 'html.parser')
 
@@ -77,7 +82,7 @@ class TimeWatch:
     return r
 
   def time_to_tuple(self, t):
-    if isinstance(t, str):
+    if isinstance(t, strtypes):
       t = self.clean_text(t)
       if ':' in t:
         t = list(map(int, t.split(':')))
@@ -204,7 +209,7 @@ class TimeWatch:
     if isinstance(month, int):
       return month
 
-    if isinstance(month, str) and month.isdigit():
+    if isinstance(month, strtypes) and month.isdigit():
       return int(month)
 
     for fmt in ['%b', '%B']:
