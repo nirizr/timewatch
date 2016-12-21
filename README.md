@@ -15,7 +15,7 @@ It is therefor handling govt. off days and weekends, and is quite configurable.
 
 ## Usage
 To report required working hours for the current month, simply execute
-```./main <company id> <employee number> <password>```
+```./main.py <company id> <employee number> <password>```
 
 ### Full usage and functionality
 
