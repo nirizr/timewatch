@@ -229,7 +229,7 @@ class TimeWatch:
       # in override=incomplete mode, only override incomplete data
       # so simply clear dates without expected time
       self.override_all = False
-      self.keep_cause = False
+      self.keep_cause = True
       self.default_duration = 0
     elif self.override == 'regular':
       self.override_all = True
