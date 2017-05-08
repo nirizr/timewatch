@@ -32,7 +32,7 @@ if __name__ == "__main__":
   parser.add_argument('-j', '--jitter', default=10, type=int,
                        help='punching time random range in minutes.')
 
-  parser.add_argument('-r', '--retries', default=5, help='amount of times to retries on failed punchin')
+  parser.add_argument('-r', '--retries', default=9, help='amount of times to retries on failed punchin')
 
   args = parser.parse_args()
 
